@@ -44,8 +44,8 @@ Formal verification is the use of **mathematical logic** to make precise stateme
 
 # Quick mathematical logic primer
 
-- `P` a variable representing some _proposition_ (either true or false)
-- `x` a variable representing an _object_ (a value like a number, or a member of some set)
+- `P` a variable representing some **proposition** (either true or false)
+- `x` a variable representing a value (like a number, or a member of some set)
 - `P x`: a proposition P which is true of a variable x
 - `¬ P`: **not** P, statement that P is false
 - `P ∧ Q`: P **and** Q, both are true
@@ -65,9 +65,9 @@ Formal verification is the use of **mathematical logic** to make precise stateme
 
 _All men are mortal_:
 
-- `∀x. Human x → Mortal x`
-- `Human socrates`
-- `Mortal socrates`
+- Premise: `∀x. Human x → Mortal x`
+- Premise: `Human socrates`
+- Conclusion: `Mortal socrates`
 
 Implication elimination:
 
@@ -91,6 +91,7 @@ Existential introduction:
 - [Material implication](https://en.wikipedia.org/wiki/Material_implication_(rule_of_inference)): `(P → Q) ↔ ¬(P ∧ ¬Q)`
 - [Contraposition](https://en.wikipedia.org/wiki/Contraposition): `(P → Q) ↔ (¬Q → ¬P)`
 - Iff bi-directionality: `(P ↔ Q) ↔ ((P → Q) ∧ (Q → P))`
+- [Ex falso quodlibet](https://en.wikipedia.org/wiki/Principle_of_explosion): `∀P. False → P`
 
 ---
 
@@ -107,13 +108,37 @@ Existential introduction:
 
 # Curry–Howard: propositions are types
 
-| Logic | Type-theoretic reading | Rust-shaped intuition |
+_It turns out_ that **Logic** and **Type Systems** are two sides of the same coin 👀
+
+- Proposition `P` ≈ Type `P`
+- Proof of `P` ≈ Instance of type `P` (a value)
+
+| Logic | Type-theoretic reading | Rust analogue |
 |---|---|---|
-| `P → Q` | function from evidence of `P` to evidence of `Q` | `fn(P) -> Q` |
+| `P → Q` | function from evidence of `P` to evidence of `Q` | `fn(_: P) -> Q` |
 | `P ∧ Q` | pair containing both proofs | `(P, Q)` |
 | `P ∨ Q` | tagged choice of one proof | `enum Either<P, Q>` |
-| `∃x, P x` | a value plus evidence about it | dependent pair |
-| `False` | a type with no constructors | uninhabited type |
+| `∀x. P x` | generic function from `X` to evidence of `P X` | `fn<X>(x: X) -> P<X>` |
+| `∃x. P x` | hidden evidence of `P x` (precise `x` unknown) | `impl P` or `Box<dyn P>`* |
+| `False` | a type with no constructors | `!` or `std::convert::Infallible` |
+
+Rust lacks **dependent types** (types that can depend on values), aside from `const` generics.
+
+*`impl P` and `Box<dyn P>` are not quite right because `P` is a trait here rather than a type.
+
+<!-- footer: [Theorem Proving in Lean: Curry–Howard](https://lean-lang.org/theorem_proving_in_lean4/Propositions-and-Proofs/) -->
+
+---
+
+# Curry–Howard: example
+
+Logic: `(P ∧ Q) → P`
+
+```rust
+fn keep_left<P, Q>(pq: (P, Q)) -> P {
+    pq.0
+}
+```
 
 ```lean
 theorem keepLeft {P Q : Prop} : P ∧ Q → P :=
@@ -123,6 +148,8 @@ theorem keepLeft {P Q : Prop} : P ∧ Q → P :=
 The theorem is literally a function: give it evidence of `P ∧ Q`; it returns evidence of `P`.
 
 <!-- footer: [Theorem Proving in Lean: Curry–Howard](https://lean-lang.org/theorem_proving_in_lean4/Propositions-and-Proofs/) -->
+
+---
 
 # What is a proof?
 
@@ -244,7 +271,7 @@ It does **not** silently prove compiler correctness, hardware correctness, or fi
 - a trustworthy link from the Rust program to the Lean term;
 - models for unsupported or external components.
 
-> Without semantics, you may prove a beautiful theorem about the wrong program.
+> Without accurate semantics, you may prove a beautiful theorem about the wrong program.
 
 <!-- footer: [Lean language reference](https://lean-lang.org/doc/reference/latest/) · [Aeneas paper](https://arxiv.org/abs/2206.07185) -->
 
@@ -256,7 +283,7 @@ It does **not** silently prove compiler correctness, hardware correctness, or fi
 <div class="stack-diagram">
   <div class="stack-layer assumption">Executable behaviour: compiler · runtime · platform · hardware</div>
   <div class="stack-layer assumption">Rust semantics and the supported-language boundary</div>
-  <div class="stack-layer assumption">Charon/Aeneas translation and external models</div>
+  <div class="stack-layer assumption">Aeneas translation and external models</div>
   <div class="stack-layer">Your theorem statement and imported library lemmas</div>
   <div class="stack-layer">Elaborator and tactics produce a proof term</div>
   <div class="stack-layer kernel">Lean kernel checks the proof term</div>
@@ -749,7 +776,7 @@ For the diff theorem, the `< 2^31` bounds and `.ok target` conclusion are not in
   <div class="num">3</div><div class="step"><strong>Inspect the generated top-level function.</strong> Understand its monad, arguments, returned state, and external models.</div>
   <div class="num">4</div><div class="step"><strong>State the top-level Lean lemma.</strong> Check that the formal statement says what the prose says before proving anything.</div>
   <div class="num">5</div><div class="step"><strong>Ask an LLM to prove it.</strong> Keep generated code stable; put proofs and helper lemmas in hand-written files.</div>
-  <div class="num">6</div><div class="step"><strong>Audit assumptions.</strong> Challenge every new premise, custom axiom, abstraction, and excluded branch.</div>
+  <div class="num">6</div><div class="step"><strong>Audit assumptions.</strong> Challenge every new premise, custom axiom and abstraction.</div>
   <div class="num">7</div><div class="step"><strong>Repeat.</strong> Refactor Rust, models, statements, and proof structure until the result is both true and useful.</div>
 </div>
 
@@ -826,11 +853,11 @@ Also check:
 
 # Five takeaways
 
-1. **A test demonstrates; a theorem quantifies.** Keep both.
-2. **Dependent types turn preconditions and invariants into ordinary types.**
-3. **Monads let pure Lean express failure, state, and effectful control flow.**
-4. **Aeneas converts much safe Rust into value-level functions, avoiding routine memory proofs.**
-5. **LLMs can build proofs; only the statement, assumptions, models, and kernel check determine what was actually established.**
+1. A test demonstrates; a theorem quantifies. Keep both.
+2. Dependent types turn preconditions and invariants into ordinary types.
+3. Monads let pure Lean express failure, state, and effectful control flow.
+4. Aeneas converts much safe Rust into value-level functions, avoiding routine memory proofs.
+5. LLMs can build proofs; only the statement, assumptions, models, and kernel check determine what was actually established.
 
 > Start with one crisp property: a roundtrip, preservation theorem, bounds guarantee, or update/read law.
 
