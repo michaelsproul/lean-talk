@@ -1,6 +1,6 @@
 ---
 title: Lean Proving for Rust Programmers
-subtitle: From tests and types to machine-checked properties of real Rust
+subtitle: Intro to formal verification
 author: Michael Sproul
 description: A practical introduction to Lean, dependent types, monads, Aeneas, and LLM-assisted proof workflows for Rust programmers.
 ---
@@ -10,7 +10,7 @@ description: A practical introduction to Lean, dependent types, monads, Aeneas, 
 
 # Lean Proving for Rust Programmers
 
-## From tests and types to machine-checked properties of real Rust
+## Intro to formal verification
 
 **Michael Sproul**
 
@@ -26,13 +26,103 @@ This is a practical bridge, not a survey of all formal methods. The goal is to m
 ---
 
 <!-- class: section -->
-<div class="kicker">The central shift</div>
 
-# From “I tried it” to “it cannot fail this way”
+# Why formal verification?
 
-Rust already trains us to move bugs into compile-time obligations. Lean pushes that idea from **types and ownership** to **arbitrary program properties**.
+Formal verification is the use of **mathematical logic** to make precise statements about the behaviour of programs **for all inputs**. More comprehensive than:
+
+- Unit tests
+- End-to-end tests
+- Property tests
+- Fuzzing
+- Static analysis
+- `.expect("qed")`
 
 ---
+
+<div class="kicker">Syntax</div>
+
+# Quick mathematical logic primer
+
+- `P` a variable representing some _proposition_ (either true or false)
+- `x` a variable representing an _object_ (a value like a number, or a member of some set)
+- `P x`: a proposition P which is true of a variable x
+- `¬ P`: **not** P, statement that P is false
+- `P ∧ Q`: P **and** Q, both are true
+- `P ∨ Q`: P **or** Q, one (or both) are true
+- `P → Q`: P **implies** Q. If P is true then Q is true
+- `P ↔ Q` or `P ≡ Q`: P **iff** Q. P is true **if and only if** Q is true
+- `∀x. P x`: **for all** x, P x is true
+- `∃x. P x`: **there exists** an x such that P x is true
+
+<!-- footer: [First-order logic](https://en.wikipedia.org/wiki/First-order_logic) -->
+
+---
+
+<div class="kicker">Examples</div>
+
+# Quick mathematical logic primer
+
+_All men are mortal_:
+
+- `∀x. Human x → Mortal x`
+- `Human socrates`
+- `Mortal socrates`
+
+Implication elimination:
+
+- `((P → Q) ∧ P) → Q`
+
+Implication chaining:
+
+- `((P → (Q → R)) ∧ P ∧ Q) → R`
+
+Existential introduction:
+
+- `P y → ∃x. P x`
+
+---
+
+<div class="kicker">Useful identities</div>
+
+# Quick mathematical logic primer
+
+- [De Morgan's Laws](https://en.wikipedia.org/wiki/De_Morgan%27s_laws): `¬(P ∧ Q) ↔ (¬P ∨ ¬Q)` and `¬(P ∨ Q) ↔ (¬P ∧ ¬Q)`
+- [Material implication](https://en.wikipedia.org/wiki/Material_implication_(rule_of_inference)): `(P → Q) ↔ ¬(P ∧ ¬Q)`
+- [Contraposition](https://en.wikipedia.org/wiki/Contraposition): `(P → Q) ↔ (¬Q → ¬P)`
+- Iff bi-directionality: `(P ↔ Q) ↔ ((P → Q) ∧ (Q → P))`
+
+---
+
+# Terminology
+
+- **Theorem Prover**: software for processing specifications & proofs written in a logical language, e.g. Lean 4.
+- **Proposition**: a specific statement about some of the objects under study, e.g. `2 + 2 = 4` or `2 + 2 = 5`
+- **Lemma/Theorem**: a proposition that has been proven true, e.g. `2 + 2 = 4`
+- **Proof**: derivation of a new fact (lemma) using legal "moves" applied to existing facts
+- **Semantics**: fancy way of saying _meaning_. The mathematical statement corresponding to some object under study, e.g. "Rust semantics in Lean" is the definition of how Rust programs translate into Lean's logic.
+- **Specification**: formal description of the correct behaviour of a program, e.g. simplified model of the program written in Lean and a collection of lemmas about it, **not** just a natural language spec.
+
+---
+
+# Curry–Howard: propositions are types
+
+| Logic | Type-theoretic reading | Rust-shaped intuition |
+|---|---|---|
+| `P → Q` | function from evidence of `P` to evidence of `Q` | `fn(P) -> Q` |
+| `P ∧ Q` | pair containing both proofs | `(P, Q)` |
+| `P ∨ Q` | tagged choice of one proof | `enum Either<P, Q>` |
+| `∃x, P x` | a value plus evidence about it | dependent pair |
+| `False` | a type with no constructors | uninhabited type |
+
+```lean
+theorem keepLeft {P Q : Prop} : P ∧ Q → P :=
+  fun h => h.left
+```
+
+The theorem is literally a function: give it evidence of `P ∧ Q`; it returns evidence of `P`.
+
+<!-- footer: [Theorem Proving in Lean: Curry–Howard](https://lean-lang.org/theorem_proving_in_lean4/Propositions-and-Proofs/) -->
 
 # What is a proof?
 
@@ -249,26 +339,6 @@ The same intuition, but the dependency mechanism is general: types may mention v
 ???
 Rust const generics are deliberately restricted: only certain primitive const parameter types are permitted, and stable type-level expressions remain limited. Lean’s dependent type theory is not just “more const generics”; it lets specifications and evidence participate directly in types.
 
----
-
-# Curry–Howard: propositions are types
-
-| Logic | Type-theoretic reading | Rust-shaped intuition |
-|---|---|---|
-| `P → Q` | function from evidence of `P` to evidence of `Q` | `fn(P) -> Q` |
-| `P ∧ Q` | pair containing both proofs | `(P, Q)` |
-| `P ∨ Q` | tagged choice of one proof | `enum Either<P, Q>` |
-| `∃ x, P x` | a value plus evidence about it | dependent pair |
-| `False` | a type with no constructors | uninhabited type |
-
-```lean
-theorem keepLeft {P Q : Prop} : P ∧ Q → P :=
-  fun h => h.left
-```
-
-The theorem is literally a function: give it evidence of `P ∧ Q`; it returns evidence of `P`.
-
-<!-- footer: [Theorem Proving in Lean: Curry–Howard](https://lean-lang.org/theorem_proving_in_lean4/Propositions-and-Proofs/) -->
 
 ---
 
