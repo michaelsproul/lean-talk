@@ -1,0 +1,1562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A practical introduction to Lean, dependent types, monads, Aeneas, and LLM-assisted proof workflows for Rust programmers.">
+<meta name="author" content="Michael Sproul">
+<title>Lean Proving for Rust Programmers</title>
+<style>
+:root {
+  --bg: #0b1020;
+  --panel: #111a2e;
+  --panel-2: #17233b;
+  --ink: #eef4ff;
+  --muted: #aab8d0;
+  --faint: #6f809d;
+  --accent: #ff8a3d;
+  --accent-2: #67d7c4;
+  --blue: #7db7ff;
+  --danger: #ff7474;
+  --line: rgba(255,255,255,0.12);
+  --shadow: 0 24px 90px rgba(0,0,0,0.45);
+  --slide-w: min(100vw, 177.7777778vh);
+  --slide-h: min(100vh, 56.25vw);
+  --base: min(1.58vw, 2.81vh);
+}
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body {
+  background:
+    radial-gradient(circle at 16% 12%, rgba(103,215,196,0.10), transparent 30%),
+    radial-gradient(circle at 88% 86%, rgba(255,138,61,0.09), transparent 34%),
+    var(--bg);
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+#deck { position: fixed; inset: 0; display: grid; place-items: center; }
+.slide {
+  display: none;
+  position: absolute;
+  width: var(--slide-w);
+  height: var(--slide-h);
+  overflow: hidden;
+  background:
+    linear-gradient(120deg, rgba(255,255,255,0.025), transparent 40%),
+    linear-gradient(165deg, #0d1426 0%, #101a30 60%, #0c1426 100%);
+  box-shadow: var(--shadow);
+  isolation: isolate;
+}
+.slide.active { display: block; }
+.slide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: calc(var(--base) * 1.5) calc(var(--base) * 1.5);
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent 62%);
+  pointer-events: none;
+  z-index: -1;
+}
+.slide-shell { position: absolute; inset: 0; padding: 5.3% 6.2% 4.8%; display: flex; flex-direction: column; }
+.slide-accent {
+  position: absolute; left: 0; top: 8.5%; width: 0.42%; height: 18%;
+  background: linear-gradient(var(--accent), var(--accent-2));
+  border-radius: 0 999px 999px 0;
+}
+.slide-content {
+  flex: 1;
+  min-height: 0;
+  font-size: var(--base);
+  line-height: 1.28;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+h1, h2, h3 { margin: 0; line-height: 1.04; letter-spacing: -0.025em; }
+h1 { font-size: 2.05em; margin-bottom: 0.48em; max-width: 95%; }
+h2 { font-size: 1.33em; margin: 0.55em 0 0.28em; color: var(--blue); }
+h3 { font-size: 1.02em; margin: 0.55em 0 0.18em; color: var(--accent-2); letter-spacing: 0; }
+p { margin: 0.22em 0 0.55em; }
+strong { color: #ffffff; font-weight: 750; }
+em { color: #d8e2f4; }
+a { color: var(--accent-2); text-decoration-thickness: 0.07em; text-underline-offset: 0.12em; }
+code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.92em;
+  color: #ffe0c7;
+  background: rgba(255,255,255,0.07);
+  padding: 0.08em 0.25em;
+  border-radius: 0.22em;
+}
+ul, ol { margin: 0.18em 0 0.35em 1.08em; padding: 0; }
+li { margin: 0.25em 0; padding-left: 0.10em; }
+li::marker { color: var(--accent); }
+blockquote {
+  margin: 0.45em 0;
+  padding: 0.55em 0.75em 0.58em;
+  border-left: 0.22em solid var(--accent);
+  background: rgba(255,138,61,0.085);
+  border-radius: 0.25em;
+}
+blockquote p:last-child { margin-bottom: 0; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 0.6em 0; }
+.columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.0em; min-height: 0; }
+.columns-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.7em; }
+.column { min-width: 0; }
+.column > :first-child { margin-top: 0; }
+.column > h2:first-child, .column > h3:first-child { margin-top: 0.08em; }
+.code-block {
+  margin: 0.30em 0 0.55em;
+  padding: 0.64em 0.76em;
+  background: #080d18;
+  border: 1px solid rgba(255,255,255,0.11);
+  border-radius: 0.45em;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.71em;
+  line-height: 1.36;
+  box-shadow: inset 0 1px rgba(255,255,255,0.035);
+}
+.code-block code { background: transparent; color: inherit; padding: 0; border-radius: 0; font-size: inherit; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 0.35em 0; font-size: 0.76em; overflow: hidden; border: 1px solid var(--line); border-radius: 0.4em; }
+th, td { padding: 0.52em 0.62em; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+th { background: rgba(125,183,255,0.12); color: #fff; font-weight: 720; }
+tr:last-child td { border-bottom: 0; }
+td + td, th + th { border-left: 1px solid var(--line); }
+.slide-footer {
+  height: 0.95em;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1em;
+  color: var(--faint);
+  font-size: calc(var(--base) * 0.46);
+  letter-spacing: 0.015em;
+}
+.slide-source { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slide-source a { color: #8799b8; }
+.slide-index { flex: none; font-variant-numeric: tabular-nums; }
+.title .slide-shell { justify-content: center; padding-left: 7.2%; }
+.title .slide-content { justify-content: center; max-width: 83%; }
+.title h1 { font-size: 2.82em; margin-bottom: 0.20em; }
+.title h2 { font-size: 1.16em; font-weight: 520; color: var(--muted); margin: 0.2em 0 0.9em; line-height: 1.28; letter-spacing: -0.012em; }
+.title .slide-accent { height: 56%; top: 22%; width: 0.52%; }
+.title::after {
+  content: "∀   →   ?";
+  position: absolute;
+  right: 5.4%; bottom: 7.4%;
+  font: 700 1.35em/1 "SFMono-Regular", Consolas, monospace;
+  color: rgba(255,255,255,0.12);
+  letter-spacing: 0.5em;
+}
+.section .slide-content { justify-content: center; max-width: 85%; }
+.section h1 { font-size: 2.55em; }
+.section p { font-size: 1.08em; color: var(--muted); max-width: 85%; }
+.dense .slide-content { font-size: calc(var(--base) * 0.87); }
+.dense .code-block { font-size: 0.68em; }
+.center .slide-content { justify-content: center; text-align: center; }
+.big-quote blockquote { font-size: 1.27em; padding: 0.75em 0.9em; }
+.kicker {
+  display: inline-block;
+  width: fit-content;
+  margin-bottom: 0.68em;
+  padding: 0.22em 0.52em;
+  border: 1px solid rgba(103,215,196,0.45);
+  border-radius: 999px;
+  color: var(--accent-2);
+  font-weight: 700;
+  font-size: 0.58em;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+.lead { font-size: 1.18em; color: #dbe7f8; max-width: 90%; }
+.muted { color: var(--muted); }
+.accent { color: var(--accent); }
+.ok { color: var(--accent-2); }
+.warn { color: var(--danger); }
+.small { font-size: 0.77em; }
+.mini { font-size: 0.62em; }
+.card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.62em; margin-top: 0.35em; }
+.card {
+  padding: 0.72em 0.76em;
+  border: 1px solid var(--line);
+  border-radius: 0.48em;
+  background: linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025));
+}
+.card h3 { margin-top: 0; color: var(--ink); }
+.card p { margin-bottom: 0; font-size: 0.78em; color: var(--muted); }
+.pipeline { display: flex; align-items: stretch; gap: 0.36em; margin: 0.65em 0 0.45em; }
+.pipe-node {
+  flex: 1;
+  padding: 0.62em 0.48em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: rgba(125,183,255,0.09);
+  border: 1px solid rgba(125,183,255,0.26);
+  border-radius: 0.42em;
+  font-weight: 680;
+  line-height: 1.15;
+}
+.pipe-node.accent-node { background: rgba(255,138,61,0.10); border-color: rgba(255,138,61,0.33); }
+.pipe-arrow { display: flex; align-items: center; color: var(--accent); font-weight: 800; }
+.logic-grid { display: grid; grid-template-columns: 0.78fr 1.15fr 1.35fr; gap: 0; margin-top: 0.35em; border: 1px solid var(--line); border-radius: 0.45em; overflow: hidden; font-size: 0.76em; }
+.logic-grid > div { padding: 0.58em 0.66em; border-bottom: 1px solid var(--line); }
+.logic-grid > div:nth-child(3n+2), .logic-grid > div:nth-child(3n+3) { border-left: 1px solid var(--line); }
+.logic-grid > div:nth-last-child(-n+3) { border-bottom: 0; }
+.logic-grid .head { background: rgba(125,183,255,0.12); color: #fff; font-weight: 720; }
+.stack-diagram { position: relative; margin: 0.42em auto; width: 88%; display: grid; gap: 0.26em; }
+.stack-layer { padding: 0.46em 0.72em; text-align: center; border: 1px solid var(--line); border-radius: 0.36em; background: rgba(255,255,255,0.045); }
+.stack-layer.kernel { background: rgba(103,215,196,0.12); border-color: rgba(103,215,196,0.38); font-weight: 750; }
+.stack-layer.assumption { background: rgba(255,138,61,0.09); border-color: rgba(255,138,61,0.31); }
+.arrow-list { list-style: none; margin-left: 0; }
+.arrow-list li { position: relative; padding-left: 1.25em; }
+.arrow-list li::before { content: "→"; position: absolute; left: 0; color: var(--accent); font-weight: 800; }
+.arrow-list li::marker { content: ""; }
+.timeline { display: grid; grid-template-columns: auto 1fr; column-gap: 0.65em; row-gap: 0.34em; margin-top: 0.35em; }
+.timeline .num { width: 1.65em; height: 1.65em; border-radius: 50%; display: grid; place-items: center; background: rgba(255,138,61,0.15); border: 1px solid rgba(255,138,61,0.38); color: var(--accent); font-weight: 800; }
+.timeline .step { padding-top: 0.16em; }
+.badge-row { display: flex; flex-wrap: wrap; gap: 0.38em; margin-top: 0.42em; }
+.badge { padding: 0.28em 0.48em; border-radius: 0.35em; background: rgba(255,255,255,0.07); border: 1px solid var(--line); font-size: 0.72em; }
+.speaker-notes { display: none; }
+body.notes-visible .speaker-notes {
+  display: block;
+  position: fixed;
+  z-index: 50;
+  right: 1.2rem;
+  bottom: 2.2rem;
+  width: min(38rem, 42vw);
+  max-height: 42vh;
+  overflow: auto;
+  padding: 1rem 1.15rem;
+  color: #172033;
+  background: rgba(250,252,255,0.96);
+  border-radius: 0.6rem;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  font-size: 15px;
+  line-height: 1.45;
+}
+#progress { position: fixed; left: 0; bottom: 0; width: 100%; height: 4px; background: rgba(255,255,255,0.06); z-index: 80; }
+#progress > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 180ms ease; }
+#help {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(5,8,16,0.84);
+  place-items: center;
+  backdrop-filter: blur(7px);
+}
+#help.visible { display: grid; }
+#help .panel { width: min(640px, 84vw); padding: 1.6rem 1.8rem; border: 1px solid var(--line); border-radius: 0.8rem; background: #111a2e; box-shadow: var(--shadow); }
+#help h2 { margin-top: 0; color: var(--ink); }
+#help kbd { display: inline-block; min-width: 2.1em; padding: 0.18em 0.42em; margin-right: 0.45em; text-align: center; border: 1px solid rgba(255,255,255,0.22); border-radius: 0.3em; background: rgba(255,255,255,0.06); color: #fff; font-family: inherit; }
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.code-block .hll { background-color: #49483e }
+.code-block { background: #272822; color: #F8F8F2 }
+.code-block .c { color: #959077 } /* Comment */
+.code-block .err { color: #ED007E; background-color: #1E0010 } /* Error */
+.code-block .esc { color: #F8F8F2 } /* Escape */
+.code-block .g { color: #F8F8F2 } /* Generic */
+.code-block .k { color: #66D9EF } /* Keyword */
+.code-block .l { color: #AE81FF } /* Literal */
+.code-block .n { color: #F8F8F2 } /* Name */
+.code-block .o { color: #FF4689 } /* Operator */
+.code-block .x { color: #F8F8F2 } /* Other */
+.code-block .p { color: #F8F8F2 } /* Punctuation */
+.code-block .ch { color: #959077 } /* Comment.Hashbang */
+.code-block .cm { color: #959077 } /* Comment.Multiline */
+.code-block .cp { color: #959077 } /* Comment.Preproc */
+.code-block .cpf { color: #959077 } /* Comment.PreprocFile */
+.code-block .c1 { color: #959077 } /* Comment.Single */
+.code-block .cs { color: #959077 } /* Comment.Special */
+.code-block .gd { color: #FF4689 } /* Generic.Deleted */
+.code-block .ge { color: #F8F8F2; font-style: italic } /* Generic.Emph */
+.code-block .ges { color: #F8F8F2; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.code-block .gr { color: #FF4689 } /* Generic.Error */
+.code-block .gh { color: #F8F8F2 } /* Generic.Heading */
+.code-block .gi { color: #A6E22E } /* Generic.Inserted */
+.code-block .go { color: #66D9EF } /* Generic.Output */
+.code-block .gp { color: #FF4689; font-weight: bold } /* Generic.Prompt */
+.code-block .gs { color: #F8F8F2; font-weight: bold } /* Generic.Strong */
+.code-block .gu { color: #959077 } /* Generic.Subheading */
+.code-block .gt { color: #66D9EF } /* Generic.Traceback */
+.code-block .kc { color: #66D9EF } /* Keyword.Constant */
+.code-block .kd { color: #66D9EF } /* Keyword.Declaration */
+.code-block .kn { color: #FF4689 } /* Keyword.Namespace */
+.code-block .kp { color: #66D9EF } /* Keyword.Pseudo */
+.code-block .kr { color: #66D9EF } /* Keyword.Reserved */
+.code-block .kt { color: #66D9EF } /* Keyword.Type */
+.code-block .ld { color: #E6DB74 } /* Literal.Date */
+.code-block .m { color: #AE81FF } /* Literal.Number */
+.code-block .s { color: #E6DB74 } /* Literal.String */
+.code-block .na { color: #A6E22E } /* Name.Attribute */
+.code-block .nb { color: #A6E22E } /* Name.Builtin */
+.code-block .nc { color: #A6E22E } /* Name.Class */
+.code-block .no { color: #66D9EF } /* Name.Constant */
+.code-block .nd { color: #A6E22E } /* Name.Decorator */
+.code-block .ni { color: #F8F8F2 } /* Name.Entity */
+.code-block .ne { color: #A6E22E } /* Name.Exception */
+.code-block .nf { color: #A6E22E } /* Name.Function */
+.code-block .nl { color: #F8F8F2 } /* Name.Label */
+.code-block .nn { color: #F8F8F2 } /* Name.Namespace */
+.code-block .nx { color: #A6E22E } /* Name.Other */
+.code-block .py { color: #F8F8F2 } /* Name.Property */
+.code-block .nt { color: #FF4689 } /* Name.Tag */
+.code-block .nv { color: #F8F8F2 } /* Name.Variable */
+.code-block .ow { color: #FF4689 } /* Operator.Word */
+.code-block .pm { color: #F8F8F2 } /* Punctuation.Marker */
+.code-block .w { color: #F8F8F2 } /* Text.Whitespace */
+.code-block .mb { color: #AE81FF } /* Literal.Number.Bin */
+.code-block .mf { color: #AE81FF } /* Literal.Number.Float */
+.code-block .mh { color: #AE81FF } /* Literal.Number.Hex */
+.code-block .mi { color: #AE81FF } /* Literal.Number.Integer */
+.code-block .mo { color: #AE81FF } /* Literal.Number.Oct */
+.code-block .sa { color: #E6DB74 } /* Literal.String.Affix */
+.code-block .sb { color: #E6DB74 } /* Literal.String.Backtick */
+.code-block .sc { color: #E6DB74 } /* Literal.String.Char */
+.code-block .dl { color: #E6DB74 } /* Literal.String.Delimiter */
+.code-block .sd { color: #E6DB74 } /* Literal.String.Doc */
+.code-block .s2 { color: #E6DB74 } /* Literal.String.Double */
+.code-block .se { color: #AE81FF } /* Literal.String.Escape */
+.code-block .sh { color: #E6DB74 } /* Literal.String.Heredoc */
+.code-block .si { color: #E6DB74 } /* Literal.String.Interpol */
+.code-block .sx { color: #E6DB74 } /* Literal.String.Other */
+.code-block .sr { color: #E6DB74 } /* Literal.String.Regex */
+.code-block .s1 { color: #E6DB74 } /* Literal.String.Single */
+.code-block .ss { color: #E6DB74 } /* Literal.String.Symbol */
+.code-block .bp { color: #A6E22E } /* Name.Builtin.Pseudo */
+.code-block .fm { color: #A6E22E } /* Name.Function.Magic */
+.code-block .vc { color: #F8F8F2 } /* Name.Variable.Class */
+.code-block .vg { color: #F8F8F2 } /* Name.Variable.Global */
+.code-block .vi { color: #F8F8F2 } /* Name.Variable.Instance */
+.code-block .vm { color: #F8F8F2 } /* Name.Variable.Magic */
+.code-block .il { color: #AE81FF } /* Literal.Number.Integer.Long */
+@media (prefers-reduced-motion: no-preference) {
+  .slide.active .slide-content > * { animation: rise 280ms ease-out both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(0.22em); } to { opacity: 1; transform: translateY(0); } }
+}
+@media print {
+  @page { size: 13.333in 7.5in; margin: 0; }
+  html, body { overflow: visible; width: auto; height: auto; background: white; }
+  #deck { position: static; display: block; }
+  .slide, .slide.active { display: block !important; position: relative; width: 13.333in; height: 7.5in; page-break-after: always; box-shadow: none; }
+  #progress, #help { display: none !important; }
+}
+</style>
+</head>
+<body>
+<main id="deck" aria-label="Lean Proving for Rust Programmers">
+
+<section class="slide title" id="slide-1" data-slide="1" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><div class="kicker">Formal verification · Lean 4 · Aeneas</div>
+
+<h1>Lean Proving for Rust Programmers</h1>
+<h2>Intro to formal verification</h2>
+<p><strong>Michael Sproul</strong></p>
+<div class="badge-row">
+  <span class="badge">tests → theorems</span>
+  <span class="badge">const generics → dependent types</span>
+  <span class="badge"><code>?</code> → monadic <code>do</code></span>
+</div>
+
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">01 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"><p>This is a practical bridge, not a survey of all formal methods. The goal is to make Lean feel like a strange but recognisable programming language, then show how Aeneas turns that into leverage on Rust code.</p>
+</aside>
+</section>
+
+
+<section class="slide section" id="slide-2" data-slide="2" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Why formal verification?</h1>
+<p>Formal verification is the use of <strong>mathematical logic</strong> to make precise statements about the behaviour of programs <strong>for all inputs</strong>. More comprehensive than:</p>
+<ul>
+<li>Unit tests</li>
+<li>End-to-end tests</li>
+<li>Property tests</li>
+<li>Fuzzing</li>
+<li>Static analysis</li>
+<li><code>.expect(&quot;qed&quot;)</code></li>
+</ul>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">02 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-3" data-slide="3" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><div class="kicker">Syntax</div>
+
+<h1>Quick mathematical logic primer</h1>
+<ul>
+<li><code>P</code> a variable representing some <strong>proposition</strong> (either true or false)</li>
+<li><code>x</code> a variable representing a value (like a number, or a member of some set)</li>
+<li><code>P x</code>: a proposition P which is true of a variable x</li>
+<li><code>¬ P</code>: <strong>not</strong> P, statement that P is false</li>
+<li><code>P ∧ Q</code>: P <strong>and</strong> Q, both are true</li>
+<li><code>P ∨ Q</code>: P <strong>or</strong> Q, one (or both) are true</li>
+<li><code>P → Q</code>: P <strong>implies</strong> Q. If P is true then Q is true</li>
+<li><code>P ↔ Q</code> or <code>P ≡ Q</code>: P <strong>iff</strong> Q. P is true <strong>if and only if</strong> Q is true</li>
+<li><code>∀x. P x</code>: <strong>for all</strong> x, P x is true</li>
+<li><code>∃x. P x</code>: <strong>there exists</strong> an x such that P x is true</li>
+</ul>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://en.wikipedia.org/wiki/First-order_logic" target="_blank" rel="noopener noreferrer">First-order logic</a></div>
+      <div class="slide-index">03 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-4" data-slide="4" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><div class="kicker">Examples</div>
+
+<h1>Quick mathematical logic primer</h1>
+<p><em>All men are mortal</em>:</p>
+<ul>
+<li>Premise: <code>∀x. Human x → Mortal x</code></li>
+<li>Premise: <code>Human socrates</code></li>
+<li>Conclusion: <code>Mortal socrates</code></li>
+</ul>
+<p>Implication elimination:</p>
+<ul>
+<li><code>((P → Q) ∧ P) → Q</code></li>
+</ul>
+<p>Implication chaining:</p>
+<ul>
+<li><code>((P → (Q → R)) ∧ P ∧ Q) → R</code></li>
+</ul>
+<p>Existential introduction:</p>
+<ul>
+<li><code>P y → ∃x. P x</code></li>
+</ul>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">04 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-5" data-slide="5" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><div class="kicker">Useful identities</div>
+
+<h1>Quick mathematical logic primer</h1>
+<ul>
+<li><a href="https://en.wikipedia.org/wiki/De_Morgan%27s_laws" target="_blank" rel="noopener noreferrer">De Morgan's Laws</a>: <code>¬(P ∧ Q) ↔ (¬P ∨ ¬Q)</code> and <code>¬(P ∨ Q) ↔ (¬P ∧ ¬Q)</code></li>
+<li><a href="https://en.wikipedia.org/wiki/Material_implication_(rule_of_inference)" target="_blank" rel="noopener noreferrer">Material implication</a>: <code>(P → Q) ↔ ¬(P ∧ ¬Q)</code></li>
+<li><a href="https://en.wikipedia.org/wiki/Contraposition" target="_blank" rel="noopener noreferrer">Contraposition</a>: <code>(P → Q) ↔ (¬Q → ¬P)</code></li>
+<li>Iff bi-directionality: <code>(P ↔ Q) ↔ ((P → Q) ∧ (Q → P))</code></li>
+<li><a href="https://en.wikipedia.org/wiki/Principle_of_explosion" target="_blank" rel="noopener noreferrer">Ex falso quodlibet</a>: <code>∀P. False → P</code></li>
+</ul>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">05 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-6" data-slide="6" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Terminology</h1>
+<ul>
+<li><strong>Theorem Prover</strong>: software for processing specifications &amp; proofs written in a logical language, e.g. Lean 4.</li>
+<li><strong>Proposition</strong>: a specific statement about some of the objects under study, e.g. <code>2 + 2 = 4</code> or <code>2 + 2 = 5</code></li>
+<li><strong>Lemma/Theorem</strong>: a proposition that has been proven true, e.g. <code>2 + 2 = 4</code></li>
+<li><strong>Proof</strong>: derivation of a new fact (lemma) using legal &quot;moves&quot; applied to existing facts</li>
+<li><strong>Semantics</strong>: fancy way of saying <em>meaning</em>. The mathematical statement corresponding to some object under study, e.g. &quot;Rust semantics in Lean&quot; is the definition of how Rust programs translate into Lean's logic.</li>
+<li><strong>Specification</strong>: formal description of the correct behaviour of a program, e.g. simplified model of the program written in Lean and a collection of lemmas about it, <strong>not</strong> just a natural language spec.</li>
+</ul>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">06 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-7" data-slide="7" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Curry–Howard: propositions are types</h1>
+<p><em>It turns out</em> that <strong>Logic</strong> and <strong>Type Systems</strong> are two sides of the same coin 👀</p>
+<ul>
+<li>Proposition <code>P</code> ≈ Type <code>P</code></li>
+<li>Proof of <code>P</code> ≈ Instance of type <code>P</code> (a value)</li>
+</ul>
+<table>
+<thead>
+<tr>
+  <th>Logic</th>
+  <th>Type-theoretic reading</th>
+  <th>Rust analogue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>P → Q</code></td>
+  <td>function from evidence of <code>P</code> to evidence of <code>Q</code></td>
+  <td><code>fn(_: P) -&gt; Q</code></td>
+</tr>
+<tr>
+  <td><code>P ∧ Q</code></td>
+  <td>pair containing both proofs</td>
+  <td><code>(P, Q)</code></td>
+</tr>
+<tr>
+  <td><code>P ∨ Q</code></td>
+  <td>tagged choice of one proof</td>
+  <td><code>enum Either&lt;P, Q&gt;</code></td>
+</tr>
+<tr>
+  <td><code>∀x. P x</code></td>
+  <td>generic function from <code>X</code> to evidence of <code>P X</code></td>
+  <td><code>fn&lt;X&gt;(x: X) -&gt; P&lt;X&gt;</code></td>
+</tr>
+<tr>
+  <td><code>∃x. P x</code></td>
+  <td>hidden evidence of <code>P x</code> (precise <code>x</code> unknown)</td>
+  <td><code>impl P</code> or <code>Box&lt;dyn P&gt;</code>*</td>
+</tr>
+<tr>
+  <td><code>False</code></td>
+  <td>a type with no constructors</td>
+  <td><code>!</code> or <code>std::convert::Infallible</code></td>
+</tr>
+</tbody>
+</table>
+<p>Rust lacks <strong>dependent types</strong> (types that can depend on values), aside from <code>const</code> generics.</p>
+<p>*<code>impl P</code> and <code>Box&lt;dyn P&gt;</code> are not quite right because <code>P</code> is a trait here rather than a type.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://lean-lang.org/theorem_proving_in_lean4/Propositions-and-Proofs/" target="_blank" rel="noopener noreferrer">Theorem Proving in Lean: Curry–Howard</a></div>
+      <div class="slide-index">07 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-8" data-slide="8" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Curry–Howard: example</h1>
+<p>Logic: <code>(P ∧ Q) → P</code></p>
+<pre class="code-block language-rust"><code><span class="k">fn</span><span class="w"> </span><span class="nf">keep_left</span><span class="o">&lt;</span><span class="n">P</span><span class="p">,</span><span class="w"> </span><span class="n">Q</span><span class="o">&gt;</span><span class="p">(</span><span class="n">pq</span><span class="p">:</span><span class="w"> </span><span class="p">(</span><span class="n">P</span><span class="p">,</span><span class="w"> </span><span class="n">Q</span><span class="p">))</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">P</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">pq</span><span class="p">.</span><span class="mi">0</span>
+<span class="p">}</span>
+</code></pre><pre class="code-block language-lean"><code><span class="kn">theorem</span><span class="w"> </span><span class="n">keepLeft</span><span class="w"> </span><span class="o">{</span><span class="n">P</span><span class="w"> </span><span class="n">Q</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">Prop</span><span class="o">}</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">P</span><span class="w"> </span><span class="bp">∧</span><span class="w"> </span><span class="n">Q</span><span class="w"> </span><span class="bp">→</span><span class="w"> </span><span class="n">P</span><span class="w"> </span><span class="o">:=</span>
+<span class="w">  </span><span class="k">fun</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="bp">=&gt;</span><span class="w"> </span><span class="n">h</span><span class="bp">.</span><span class="n">left</span>
+</code></pre><p>The theorem is literally a function: give it evidence of <code>P ∧ Q</code>; it returns evidence of <code>P</code>.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://lean-lang.org/theorem_proving_in_lean4/Propositions-and-Proofs/" target="_blank" rel="noopener noreferrer">Theorem Proving in Lean: Curry–Howard</a></div>
+      <div class="slide-index">08 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-9" data-slide="9" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>What is a proof?</h1>
+<p>A formal proof has three parts:</p>
+<div class="card-grid">
+  <div class="card">
+    <h3>1 · Proposition</h3>
+    <p>A precise statement, expressed as a Lean type.</p>
+  </div>
+  <div class="card">
+    <h3>2 · Evidence</h3>
+    <p>A term inhabiting that type — often constructed by tactics.</p>
+  </div>
+  <div class="card">
+    <h3>3 · Kernel check</h3>
+    <p>A small checker verifies the term using Lean’s core rules.</p>
+  </div>
+</div>
+
+<blockquote>
+<p>Think of a proof as a value that successfully type-checks against an extremely precise interface.</p>
+</blockquote>
+<p><strong>Important:</strong> the kernel checks the proof <em>of the statement you wrote</em>. It does not check that the statement matches your intent.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://lean-lang.org/theorem_proving_in_lean4/Propositions-and-Proofs/" target="_blank" rel="noopener noreferrer">Lean: propositions and proofs</a></div>
+      <div class="slide-index">09 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-10" data-slide="10" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>A test samples; a proof quantifies</h1>
+<div class="columns columns-2"><div class="column"><h2>Test</h2>
+<pre class="code-block language-rust"><code><span class="cp">#[test]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">roundtrip_example</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">b"old"</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">b"new"</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">diff</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">encode</span><span class="p">(</span><span class="n">source</span><span class="p">,</span><span class="w"> </span><span class="n">target</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">decode</span><span class="p">(</span><span class="n">diff</span><span class="p">,</span><span class="w"> </span><span class="n">source</span><span class="p">),</span><span class="w"> </span><span class="nb">Ok</span><span class="p">(</span><span class="n">target</span><span class="p">));</span>
+<span class="p">}</span>
+</code></pre><p>Checks <strong>one execution</strong> — or many executions with fuzzing/property testing.</p>
+</div><div class="column"><h2>Theorem</h2>
+<pre class="code-block language-lean"><code><span class="kn">theorem</span><span class="w"> </span><span class="n">roundtrip</span>
+<span class="w">    </span><span class="o">(</span><span class="n">source</span><span class="w"> </span><span class="n">target</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">ByteArray</span><span class="o">)</span>
+<span class="w">    </span><span class="o">(</span><span class="n">h₁</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">source</span><span class="bp">.</span><span class="n">size</span><span class="w"> </span><span class="bp">&lt;</span><span class="w"> </span><span class="mi">2</span><span class="bp">^</span><span class="mi">31</span><span class="o">)</span>
+<span class="w">    </span><span class="o">(</span><span class="n">h₂</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">target</span><span class="bp">.</span><span class="n">size</span><span class="w"> </span><span class="bp">&lt;</span><span class="w"> </span><span class="mi">2</span><span class="bp">^</span><span class="mi">31</span><span class="o">)</span><span class="w"> </span><span class="o">:</span>
+<span class="w">    </span><span class="n">decode</span><span class="w"> </span><span class="o">(</span><span class="n">encode</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="n">target</span><span class="o">)</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="bp">=</span><span class="w"> </span><span class="bp">.</span><span class="n">ok</span><span class="w"> </span><span class="n">target</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">by</span>
+<span class="w">  </span><span class="bp">...</span>
+</code></pre><p>Checks <strong>every</strong> <code>source</code> and <code>target</code> satisfying the premises — inside the formal model.</p>
+</div></div></div>
+    <div class="slide-footer">
+      <div class="slide-source">Example adapted from <a href="https://github.com/michaelsproul/lean-bdiff" target="_blank" rel="noopener noreferrer">lean-bdiff</a></div>
+      <div class="slide-index">10 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"><p>Proofs do not make tests obsolete. Tests are excellent for integration, performance, platform behaviour, and checking that the model tracks the implementation. The distinction is coverage: a theorem is universal over its quantified domain.</p>
+</aside>
+</section>
+
+
+<section class="slide" id="slide-11" data-slide="11" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Proofs and tests answer different questions</h1>
+<table>
+<thead>
+<tr>
+  <th></th>
+  <th>Tests</th>
+  <th>Proofs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Coverage</td>
+  <td>Chosen or generated executions</td>
+  <td>All values covered by the theorem</td>
+</tr>
+<tr>
+  <td>Best at</td>
+  <td>Integration, regressions, performance, real environments</td>
+  <td>Functional correctness, invariants, impossibility claims</td>
+</tr>
+<tr>
+  <td>Failure mode</td>
+  <td>Missed input or timing</td>
+  <td>Wrong statement, wrong model, hidden assumption</td>
+</tr>
+<tr>
+  <td>Cost profile</td>
+  <td>Cheap to start; coverage is never complete</td>
+  <td>Expensive to state/model; exhaustive once checked</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Strong engineering uses both: <strong>tests connect the model to reality; proofs exhaust the model.</strong></p>
+</blockquote>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">11 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-12" data-slide="12" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Every theorem is conditional</h1>
+<div class="pipeline">
+  <div class="pipe-node">formal semantics<br>or translation</div>
+  <div class="pipe-arrow">∧</div>
+  <div class="pipe-node">explicit premises<br>and axioms</div>
+  <div class="pipe-arrow">⇒</div>
+  <div class="pipe-node accent-node">the stated<br>property</div>
+</div>
+
+<p>A green proof means:</p>
+<ul>
+<li>the proposition is derivable in Lean;</li>
+<li>using the definitions, imported lemmas, and axioms in scope;</li>
+<li>under the premises written before the colon.</li>
+</ul>
+<p>It does <strong>not</strong> silently prove compiler correctness, hardware correctness, or fidelity of an unverified translation.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">12 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-13" data-slide="13" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>What formal verification needs</h1>
+<div class="columns columns-2"><div class="column"><h2>A theorem prover with a small TCB</h2>
+<ul>
+<li>a precise logic;</li>
+<li>a small proof-checking kernel;</li>
+<li>automation that emits kernel-checkable proof terms;</li>
+<li>an audit path for axioms and incomplete proofs.</li>
+</ul>
+</div><div class="column"><h2>Semantics for the language</h2>
+<ul>
+<li>what each Rust construct means;</li>
+<li>how panics, overflow, borrowing, and mutation behave;</li>
+<li>a trustworthy link from the Rust program to the Lean term;</li>
+<li>models for unsupported or external components.</li>
+</ul>
+<blockquote>
+<p>Without accurate semantics, you may prove a beautiful theorem about the wrong program.</p>
+</blockquote>
+</div></div></div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://lean-lang.org/doc/reference/latest/" target="_blank" rel="noopener noreferrer">Lean language reference</a> · <a href="https://arxiv.org/abs/2206.07185" target="_blank" rel="noopener noreferrer">Aeneas paper</a></div>
+      <div class="slide-index">13 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide dense" id="slide-14" data-slide="14" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>The trusted computing base is a stack</h1>
+<div class="stack-diagram">
+  <div class="stack-layer assumption">Executable behaviour: compiler · runtime · platform · hardware</div>
+  <div class="stack-layer assumption">Rust semantics and the supported-language boundary</div>
+  <div class="stack-layer assumption">Aeneas translation and external models</div>
+  <div class="stack-layer">Your theorem statement and imported library lemmas</div>
+  <div class="stack-layer">Elaborator and tactics produce a proof term</div>
+  <div class="stack-layer kernel">Lean kernel checks the proof term</div>
+</div>
+
+<p><strong>Minimal TCB</strong> means keeping the part that can <em>silently certify a false theorem</em> as small and inspectable as possible.</p>
+<p>Lean’s kernel is deliberately small. An end-to-end claim about compiled Rust still depends on the semantic and translation layers above it — unless those layers are themselves verified.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://lean-lang.org/doc/reference/latest/" target="_blank" rel="noopener noreferrer">Lean reference: kernel and proof checking</a></div>
+      <div class="slide-index">14 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide section" id="slide-15" data-slide="15" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><div class="kicker">Dependent types</div>
+
+<h1>Types may depend on values</h1>
+<p>A normal generic type varies over a <strong>type</strong>. A dependent type may vary over an ordinary <strong>term</strong> — including a length, an index, or a proof.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">15 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-16" data-slide="16" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>A bounds proof can be an argument</h1>
+<pre class="code-block language-lean"><code><span class="kn">def</span><span class="w"> </span><span class="n">safeGet</span><span class="w"> </span><span class="o">(</span><span class="n">xs</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Array</span><span class="w"> </span><span class="n">α</span><span class="o">)</span><span class="w"> </span><span class="o">(</span><span class="n">i</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Fin</span><span class="w"> </span><span class="n">xs</span><span class="bp">.</span><span class="n">size</span><span class="o">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">α</span><span class="w"> </span><span class="o">:=</span>
+<span class="w">  </span><span class="n">xs</span><span class="o">[</span><span class="n">i</span><span class="o">]</span>
+</code></pre><p><code>Fin xs.size</code> means: a natural number together with evidence that it is smaller than <code>xs.size</code>.</p>
+<p>The function does not accept an arbitrary index and then <em>hope</em> it is valid. The validity requirement is part of the input type.</p>
+<div class="badge-row">
+  <span class="badge"><code>xs</code> is a value</span>
+  <span class="badge"><code>xs.size</code> appears in a type</span>
+  <span class="badge"><code>i</code> carries a proof</span>
+</div>
+
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://lean-lang.org/functional_programming_in_lean/Interlude___-Propositions___-Proofs___-and-Indexing/" target="_blank" rel="noopener noreferrer">Functional Programming in Lean: proofs and indexing</a></div>
+      <div class="slide-index">16 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-17" data-slide="17" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Rust const generics are a useful foothold</h1>
+<div class="columns columns-2"><div class="column"><h2>Rust</h2>
+<pre class="code-block language-rust"><code><span class="k">struct</span><span class="w"> </span><span class="nc">Matrix</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">R</span><span class="p">:</span><span class="w"> </span><span class="kt">usize</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">C</span><span class="p">:</span><span class="w"> </span><span class="kt">usize</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="n">T</span><span class="p">;</span><span class="w"> </span><span class="n">C</span><span class="p">];</span><span class="w"> </span><span class="n">R</span><span class="p">],</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">transpose</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">R</span><span class="p">:</span><span class="w"> </span><span class="kt">usize</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">C</span><span class="p">:</span><span class="w"> </span><span class="kt">usize</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">    </span><span class="n">m</span><span class="p">:</span><span class="w"> </span><span class="nc">Matrix</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span><span class="w"> </span><span class="n">R</span><span class="p">,</span><span class="w"> </span><span class="n">C</span><span class="o">&gt;</span><span class="p">,</span>
+<span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Matrix</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span><span class="w"> </span><span class="n">C</span><span class="p">,</span><span class="w"> </span><span class="n">R</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="fm">todo!</span><span class="p">()</span>
+<span class="p">}</span>
+</code></pre><p>The type records selected compile-time constants.</p>
+</div><div class="column"><h2>Lean</h2>
+<pre class="code-block language-lean"><code><span class="kn">structure</span><span class="w"> </span><span class="n">Matrix</span><span class="w"> </span><span class="o">(</span><span class="n">α</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">Type</span><span class="o">)</span><span class="w"> </span><span class="o">(</span><span class="n">rows</span><span class="w"> </span><span class="n">cols</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Nat</span><span class="o">)</span><span class="w"> </span><span class="kn">where</span>
+<span class="w">  </span><span class="k">at</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Fin</span><span class="w"> </span><span class="n">rows</span><span class="w"> </span><span class="bp">→</span><span class="w"> </span><span class="n">Fin</span><span class="w"> </span><span class="n">cols</span><span class="w"> </span><span class="bp">→</span><span class="w"> </span><span class="n">α</span>
+
+<span class="kn">def</span><span class="w"> </span><span class="n">Matrix</span><span class="bp">.</span><span class="n">transpose</span><span class="w"> </span><span class="o">(</span><span class="n">m</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Matrix</span><span class="w"> </span><span class="n">α</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="n">c</span><span class="o">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Matrix</span><span class="w"> </span><span class="n">α</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">:=</span>
+<span class="w">  </span><span class="bp">⟨</span><span class="k">fun</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="bp">=&gt;</span><span class="w"> </span><span class="n">m</span><span class="bp">.</span><span class="k">at</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="n">i</span><span class="bp">⟩</span>
+</code></pre><p>The same intuition, but the dependency mechanism is general: types may mention values, computations, and propositions.</p>
+</div></div></div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://doc.rust-lang.org/reference/items/generics.html#const-generics" target="_blank" rel="noopener noreferrer">Rust Reference: const generics</a></div>
+      <div class="slide-index">17 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"><p>Rust const generics are deliberately restricted: only certain primitive const parameter types are permitted, and stable type-level expressions remain limited. Lean’s dependent type theory is not just “more const generics”; it lets specifications and evidence participate directly in types.</p>
+</aside>
+</section>
+
+
+<section class="slide section" id="slide-18" data-slide="18" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><div class="kicker">Lean syntax</div>
+
+<h1>Programs, specifications, and proofs share one language</h1>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">18 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide dense" id="slide-19" data-slide="19" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1><code>def</code>, <code>axiom</code>, <code>theorem</code>, <code>lemma</code></h1>
+<pre class="code-block language-lean"><code><span class="c1">-- Computational content: Lean can unfold and evaluate it.</span>
+<span class="kn">def</span><span class="w"> </span><span class="n">inc</span><span class="w"> </span><span class="o">(</span><span class="n">n</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Nat</span><span class="o">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Nat</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="bp">+</span><span class="w"> </span><span class="mi">1</span>
+
+<span class="c1">-- Opaque constant with no implementation here.</span>
+<span class="kn">opaque</span><span class="w"> </span><span class="n">external</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Nat</span><span class="w"> </span><span class="bp">→</span><span class="w"> </span><span class="n">Nat</span>
+
+<span class="c1">-- Trusted proposition: assumed, not proved.</span>
+<span class="kn">axiom</span><span class="w"> </span><span class="n">external_spec</span><span class="w"> </span><span class="o">(</span><span class="n">n</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Nat</span><span class="o">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">external</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="bp">=</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="bp">+</span><span class="w"> </span><span class="mi">1</span>
+
+<span class="c1">-- An opaque proof checked by the kernel.</span>
+<span class="kn">theorem</span><span class="w"> </span><span class="n">inc_pos</span><span class="w"> </span><span class="o">(</span><span class="n">n</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Nat</span><span class="o">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="bp">&lt;</span><span class="w"> </span><span class="n">inc</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">by</span>
+<span class="w">  </span><span class="n">simp</span><span class="w"> </span><span class="o">[</span><span class="n">inc</span><span class="o">]</span>
+
+<span class="c1">-- `lemma` is the same kind of declaration; the name signals a helper result.</span>
+<span class="kn">lemma</span><span class="w"> </span><span class="n">inc_ne_zero</span><span class="w"> </span><span class="o">(</span><span class="n">n</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Nat</span><span class="o">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">inc</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="bp">≠</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">by</span>
+<span class="w">  </span><span class="n">simp</span><span class="w"> </span><span class="o">[</span><span class="n">inc</span><span class="o">]</span>
+</code></pre><ul>
+<li><strong>Definitions</strong> choose a value or implementation.</li>
+<li><strong>Axioms</strong> enlarge the trusted assumptions.</li>
+<li><strong>Theorems/lemmas</strong> must provide proof evidence.</li>
+</ul>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">19 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-20" data-slide="20" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Lean code is pure functional code</h1>
+<pre class="code-block language-lean"><code><span class="kn">def</span><span class="w"> </span><span class="n">firstEven?</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">List</span><span class="w"> </span><span class="n">Nat</span><span class="w"> </span><span class="bp">→</span><span class="w"> </span><span class="n">Option</span><span class="w"> </span><span class="n">Nat</span>
+<span class="w">  </span><span class="bp">|</span><span class="w"> </span><span class="o">[]</span><span class="w"> </span><span class="bp">=&gt;</span><span class="w"> </span><span class="n">none</span>
+<span class="w">  </span><span class="bp">|</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="bp">::</span><span class="w"> </span><span class="n">xs</span><span class="w"> </span><span class="bp">=&gt;</span>
+<span class="w">      </span><span class="k">if</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="bp">%</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="bp">=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="k">then</span>
+<span class="w">        </span><span class="n">some</span><span class="w"> </span><span class="n">x</span>
+<span class="w">      </span><span class="k">else</span>
+<span class="w">        </span><span class="n">firstEven?</span><span class="w"> </span><span class="n">xs</span>
+</code></pre><p>Familiar ingredients:</p>
+<ul>
+<li>algebraic data types and pattern matching;</li>
+<li>immutable values;</li>
+<li>higher-order functions and type classes;</li>
+<li>recursion, with termination checked by default;</li>
+<li>definitions that can be unfolded during proofs.</li>
+</ul>
+<p>Lean is both a theorem prover <strong>and</strong> a functional programming language.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://lean-lang.org/doc/reference/latest/" target="_blank" rel="noopener noreferrer">Lean language reference</a></div>
+      <div class="slide-index">20 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-21" data-slide="21" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Term proofs and tactic scripts</h1>
+<div class="columns columns-2"><div class="column"><h2>Direct proof term</h2>
+<pre class="code-block language-lean"><code><span class="kn">theorem</span><span class="w"> </span><span class="n">keepLeft₁</span><span class="w"> </span><span class="o">{</span><span class="n">P</span><span class="w"> </span><span class="n">Q</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">Prop</span><span class="o">}</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">P</span><span class="w"> </span><span class="bp">∧</span><span class="w"> </span><span class="n">Q</span><span class="w"> </span><span class="bp">→</span><span class="w"> </span><span class="n">P</span><span class="w"> </span><span class="o">:=</span>
+<span class="w">  </span><span class="k">fun</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="bp">=&gt;</span><span class="w"> </span><span class="n">h</span><span class="bp">.</span><span class="n">left</span>
+</code></pre><p>You manually write the value inhabiting the proposition.</p>
+</div><div class="column"><h2>Tactic script</h2>
+<pre class="code-block language-lean"><code><span class="kn">theorem</span><span class="w"> </span><span class="n">keepLeft₂</span><span class="w"> </span><span class="o">{</span><span class="n">P</span><span class="w"> </span><span class="n">Q</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">Prop</span><span class="o">}</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">P</span><span class="w"> </span><span class="bp">∧</span><span class="w"> </span><span class="n">Q</span><span class="w"> </span><span class="bp">→</span><span class="w"> </span><span class="n">P</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">by</span>
+<span class="w">  </span><span class="n">intro</span><span class="w"> </span><span class="n">h</span>
+<span class="w">  </span><span class="n">exact</span><span class="w"> </span><span class="n">h</span><span class="bp">.</span><span class="n">left</span>
+</code></pre><p>Tactics manipulate a goal state and construct the proof term for you.</p>
+<blockquote>
+<p>Both end the same way: the kernel checks a proof term. A buggy tactic should fail to produce a valid term, not forge a theorem.</p>
+</blockquote>
+</div></div></div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://lean-lang.org/doc/reference/latest/Tactic-Proofs/" target="_blank" rel="noopener noreferrer">Lean: tactic proofs</a></div>
+      <div class="slide-index">21 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-22" data-slide="22" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1><code>sorry</code> is productive debt</h1>
+<pre class="code-block language-lean"><code><span class="kn">theorem</span><span class="w"> </span><span class="n">difficult_property</span><span class="w"> </span><span class="o">(</span><span class="n">x</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Input</span><span class="o">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Spec</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">by</span>
+<span class="w">  </span><span class="c1">-- Establish the architecture now; fill this sub-proof later.</span>
+<span class="w">  </span><span class="gr">sorry</span>
+
+<span class="bp">#</span><span class="n">print</span><span class="w"> </span><span class="n">axioms</span><span class="w"> </span><span class="n">difficult_property</span>
+<span class="c1">-- ... depends on: sorryAx</span>
+</code></pre><p><code>sorry</code> temporarily inhabits any goal so that the rest of the development can elaborate.</p>
+<p><strong>Useful for:</strong></p>
+<ul>
+<li>top-down proof design;</li>
+<li>defining helper-lemma interfaces;</li>
+<li>keeping generated and hand-written code compiling during exploration.</li>
+</ul>
+<p><strong>Not a completed proof:</strong> it introduces <code>sorryAx</code>, emits a warning, and must be removed or explicitly accepted as an assumption.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://lean-lang.org/doc/reference/latest/ValidatingProofs/" target="_blank" rel="noopener noreferrer">Lean: validating proofs and printing axioms</a></div>
+      <div class="slide-index">22 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide section" id="slide-23" data-slide="23" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><div class="kicker">Monads</div>
+
+<h1>A shared abstraction for failure, state, and effects</h1>
+<p>Rust programmers already use monadic interfaces — even when we rarely call them that.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">23 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-24" data-slide="24" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>One sequencing interface, many meanings</h1>
+<pre class="code-block language-lean"><code><span class="c1">-- Simplified shape of Lean's type class.</span>
+<span class="kn">class</span><span class="w"> </span><span class="n">Monad</span><span class="w"> </span><span class="o">(</span><span class="n">m</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">Type</span><span class="w"> </span><span class="bp">→</span><span class="w"> </span><span class="kt">Type</span><span class="o">)</span><span class="w"> </span><span class="kn">where</span>
+<span class="w">  </span><span class="n">pure</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">α</span><span class="w"> </span><span class="bp">→</span><span class="w"> </span><span class="n">m</span><span class="w"> </span><span class="n">α</span>
+<span class="w">  </span><span class="n">bind</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">m</span><span class="w"> </span><span class="n">α</span><span class="w"> </span><span class="bp">→</span><span class="w"> </span><span class="o">(</span><span class="n">α</span><span class="w"> </span><span class="bp">→</span><span class="w"> </span><span class="n">m</span><span class="w"> </span><span class="n">β</span><span class="o">)</span><span class="w"> </span><span class="bp">→</span><span class="w"> </span><span class="n">m</span><span class="w"> </span><span class="n">β</span>
+</code></pre><div class="card-grid">
+  <div class="card">
+    <h3><code>Option α</code></h3>
+    <p>May return a value or stop with <code>none</code>.</p>
+  </div>
+  <div class="card">
+    <h3><code>Except ε α</code></h3>
+    <p>May return a value or stop with a typed error.</p>
+  </div>
+  <div class="card">
+    <h3><code>StateM σ α</code></h3>
+    <p>Threads state while producing a result.</p>
+  </div>
+</div>
+
+<p><code>bind</code> says: run this computation; if it produces a value, feed that value into the next computation.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://lean-lang.org/functional_programming_in_lean/Monads/The-Monad-Type-Class/" target="_blank" rel="noopener noreferrer">Functional Programming in Lean: monads</a></div>
+      <div class="slide-index">24 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-25" data-slide="25" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Rust <code>?</code> and Lean <code>do</code> tell the same story</h1>
+<div class="columns columns-2"><div class="column"><h2>Rust</h2>
+<pre class="code-block language-rust"><code><span class="k">fn</span><span class="w"> </span><span class="nf">first_plus_last</span><span class="p">(</span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="p">[</span><span class="kt">u64</span><span class="p">])</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="kt">u64</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">first</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xs</span><span class="p">.</span><span class="n">first</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">last</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xs</span><span class="p">.</span><span class="n">last</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="nb">Some</span><span class="p">(</span><span class="n">first</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">last</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre><p><code>?</code> unwraps success and propagates failure.</p>
+</div><div class="column"><h2>Lean</h2>
+<pre class="code-block language-lean"><code><span class="kn">def</span><span class="w"> </span><span class="n">firstPlusLast?</span><span class="w"> </span><span class="o">(</span><span class="n">xs</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">List</span><span class="w"> </span><span class="n">Nat</span><span class="o">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Option</span><span class="w"> </span><span class="n">Nat</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">do</span>
+<span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">first</span><span class="w"> </span><span class="bp">←</span><span class="w"> </span><span class="n">xs</span><span class="bp">.</span><span class="n">head?</span>
+<span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">last</span><span class="w"> </span><span class="bp">←</span><span class="w"> </span><span class="n">xs</span><span class="bp">.</span><span class="n">reverse</span><span class="bp">.</span><span class="n">head?</span>
+<span class="w">  </span><span class="n">pure</span><span class="w"> </span><span class="o">(</span><span class="n">first</span><span class="w"> </span><span class="bp">+</span><span class="w"> </span><span class="n">last</span><span class="o">)</span>
+</code></pre><p><code>do</code> notation desugars into <code>bind</code> calls and propagates <code>none</code>.</p>
+<p>The syntax differs; the control-flow shape is nearly identical.</p>
+</div></div></div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://lean-lang.org/functional_programming_in_lean/Monads/" target="_blank" rel="noopener noreferrer">Lean: do notation</a></div>
+      <div class="slide-index">25 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-26" data-slide="26" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Stateful code can still be represented purely</h1>
+<div class="big-quote">
+
+<blockquote>
+<p><code>StateM σ α</code> is approximately a function <code>σ → (α × σ)</code>.</p>
+</blockquote>
+</div>
+
+<pre class="code-block language-lean"><code><span class="kn">def</span><span class="w"> </span><span class="n">bump</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">StateM</span><span class="w"> </span><span class="n">Nat</span><span class="w"> </span><span class="n">Nat</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">do</span>
+<span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">before</span><span class="w"> </span><span class="bp">←</span><span class="w"> </span><span class="n">get</span>
+<span class="w">  </span><span class="n">set</span><span class="w"> </span><span class="o">(</span><span class="n">before</span><span class="w"> </span><span class="bp">+</span><span class="w"> </span><span class="mi">1</span><span class="o">)</span>
+<span class="w">  </span><span class="n">pure</span><span class="w"> </span><span class="n">before</span>
+
+<span class="bp">#</span><span class="n">eval</span><span class="w"> </span><span class="n">bump</span><span class="bp">.</span><span class="n">run</span><span class="w"> </span><span class="mi">41</span>
+<span class="c1">-- (41, 42)</span>
+</code></pre><p>There is no hidden mutable cell in the mathematical meaning. The state is an input and an output; monadic syntax makes the explicit plumbing readable.</p>
+<p>This is the key idea behind making imperative-looking programs pleasant to reason about in Lean.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">26 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide section" id="slide-27" data-slide="27" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><div class="kicker">Aeneas</div>
+
+<h1>Translate Rust into proof-friendly Lean</h1>
+<p>Aeneas exploits Rust’s ownership information to remove most memory reasoning from functional-correctness proofs.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">27 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-28" data-slide="28" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>The Aeneas pipeline</h1>
+<div class="pipeline">
+  <div class="pipe-node">Rust<br>source</div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-node">rustc<br>MIR</div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-node">Charon<br>LLBC</div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-node accent-node">Aeneas<br>translation</div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-node">pure-ish<br>Lean</div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-node">theorems<br>and proofs</div>
+</div>
+
+<p>For the supported subset, the generated representation is <strong>value-based</strong>:</p>
+<ul>
+<li>no addresses or pointer arithmetic;</li>
+<li>no explicit heap model;</li>
+<li>borrowing becomes functional dataflow;</li>
+<li>proofs focus on inputs, outputs, and invariants.</li>
+</ul>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://github.com/AeneasVerif/aeneas" target="_blank" rel="noopener noreferrer">Aeneas repository</a> · <a href="https://arxiv.org/abs/2206.07185" target="_blank" rel="noopener noreferrer">Aeneas paper</a></div>
+      <div class="slide-index">28 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-29" data-slide="29" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Mutation becomes returned data</h1>
+<div class="columns columns-2"><div class="column"><h2>Rust</h2>
+<pre class="code-block language-rust"><code><span class="k">fn</span><span class="w"> </span><span class="nf">increment</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="nc">mut</span><span class="w"> </span><span class="kt">u64</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u64</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">old</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="n">x</span><span class="p">;</span>
+<span class="w">    </span><span class="o">*</span><span class="n">x</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="n">old</span>
+<span class="p">}</span>
+</code></pre><p>The source talks about a mutable reference.</p>
+</div><div class="column"><h2>Conceptual Lean shape</h2>
+<pre class="code-block language-lean"><code><span class="c1">-- Schematic, not exact generated syntax.</span>
+<span class="kn">def</span><span class="w"> </span><span class="n">increment</span><span class="w"> </span><span class="o">(</span><span class="n">x</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">U64</span><span class="o">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Result</span><span class="w"> </span><span class="o">(</span><span class="n">U64</span><span class="w"> </span><span class="bp">×</span><span class="w"> </span><span class="n">U64</span><span class="o">)</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">do</span>
+<span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">old</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="n">x</span>
+<span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">updated</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="bp">+</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">  </span><span class="n">pure</span><span class="w"> </span><span class="o">(</span><span class="n">old</span><span class="o">,</span><span class="w"> </span><span class="n">updated</span><span class="o">)</span>
+</code></pre><p>The translated function returns both the ordinary result and the updated referent. More complex mutable borrows may generate paired forward/backward functions.</p>
+<blockquote>
+<p>The proof usually reasons about values — not alias sets, heaps, or separation logic.</p>
+</blockquote>
+</div></div></div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://lean-lang.org/use-cases/aeneas/" target="_blank" rel="noopener noreferrer">Aeneas: functional translation</a></div>
+      <div class="slide-index">29 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide dense" id="slide-30" data-slide="30" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Unsupported code becomes an explicit boundary</h1>
+<p>Aeneas’s pure translation does not cover all Rust. Important boundaries include:</p>
+<div class="card-grid">
+  <div class="card">
+    <h3>Not pure-translatable</h3>
+    <p><code>unsafe</code>, concurrency, interior mutability, raw memory operations, and many I/O patterns.</p>
+  </div>
+  <div class="card">
+    <h3>External models</h3>
+    <p>Smart pointers, locks, hashers, FFI, and library functions can receive hand-written Lean models.</p>
+  </div>
+  <div class="card">
+    <h3>Axioms/specifications</h3>
+    <p>Opaque behaviour may be characterised by axioms. The final theorem is conditional on them.</p>
+  </div>
+</div>
+
+<p>Prefer <strong>executable definitions</strong> where possible; reserve axioms for properties you genuinely choose to trust.</p>
+<p>A model such as <code>RwLock T := T</code> proves facts about the protected value in a sequential abstraction. It does <strong>not</strong> verify locking or concurrent execution.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://www.sonho.fr/assets/documents/aeneas.html" target="_blank" rel="noopener noreferrer">Aeneas limitations</a></div>
+      <div class="slide-index">30 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-31" data-slide="31" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Milhouse: erase plumbing, keep behaviour</h1>
+<p>In the Milhouse Aeneas development, external concepts were modelled at a high level:</p>
+<pre class="code-block language-lean"><code><span class="c1">-- Conceptual excerpts from the external model.</span>
+<span class="n">Arc</span><span class="w"> </span><span class="n">T</span><span class="w">          </span><span class="o">:=</span><span class="w"> </span><span class="n">T</span>
+<span class="n">RwLock</span><span class="w"> </span><span class="n">R</span><span class="w"> </span><span class="n">T</span><span class="w">     </span><span class="o">:=</span><span class="w"> </span><span class="n">T</span>
+<span class="n">HashMap</span><span class="w"> </span><span class="n">K</span><span class="w"> </span><span class="n">V</span><span class="w">    </span><span class="o">:=</span><span class="w"> </span><span class="n">List</span><span class="w"> </span><span class="o">(</span><span class="n">K</span><span class="w"> </span><span class="bp">×</span><span class="w"> </span><span class="n">V</span><span class="o">)</span>
+<span class="n">HasherState</span><span class="w">    </span><span class="o">:=</span><span class="w"> </span><span class="n">Unit</span>
+</code></pre><ul>
+<li>pointer-like containers became plain values;</li>
+<li>maps became association lists;</li>
+<li>most external functions received definitional models;</li>
+<li>only genuinely opaque facts such as an <code>Arc::ptr_eq</code> characterisation and a <code>size_of</code> specification required axioms.</li>
+</ul>
+<p>The payoff: early <code>get_recursive</code> and update/get lemmas reduced lock/deref plumbing away, so <code>unfold</code> plus <code>simp</code> could close the goals.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://github.com/sigp/milhouse/pull/104" target="_blank" rel="noopener noreferrer">Milhouse PR #104</a></div>
+      <div class="slide-index">31 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide dense" id="slide-32" data-slide="32" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Milhouse: proofs became design feedback</h1>
+<p>The proof effort did more than certify existing code:</p>
+<ul>
+<li>the general update/get roundtrip required a <strong>strong induction</strong> matching the real recursive control flow;</li>
+<li>packed leaves exposed a genuine side condition around updates through zero nodes;</li>
+<li>“dense tree” invariants made implicit container assumptions explicit;</li>
+<li>an overly permissive <code>bulk_update</code> operation was identified as unsound and removed;</li>
+<li><code>intra_rebase</code> was strengthened so subtree sharing preserves represented length.</li>
+</ul>
+<blockquote>
+<p>A stubborn premise may be proof friction — or it may be the missing invariant that the implementation was relying on all along.</p>
+</blockquote>
+<p>The workflow is not merely “prove the code”. It is often <strong>specify → discover → repair → prove</strong>.</p>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://github.com/sigp/milhouse/pull/104" target="_blank" rel="noopener noreferrer">Milhouse PR #104: proof and invariant history</a></div>
+      <div class="slide-index">32 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-33" data-slide="33" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Binary diffs: a compact end-to-end contract</h1>
+<pre class="code-block language-lean"><code><span class="kn">theorem</span><span class="w"> </span><span class="n">full_encode_decode_roundtrip_final</span>
+<span class="w">    </span><span class="o">(</span><span class="n">source</span><span class="w"> </span><span class="n">target</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">ByteArray</span><span class="o">)</span>
+<span class="w">    </span><span class="o">(</span><span class="n">h_source_bound</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">source</span><span class="bp">.</span><span class="n">size</span><span class="w"> </span><span class="bp">&lt;</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="bp">^</span><span class="w"> </span><span class="mi">31</span><span class="o">)</span>
+<span class="w">    </span><span class="o">(</span><span class="n">h_target_bound</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">target</span><span class="bp">.</span><span class="n">size</span><span class="w"> </span><span class="bp">&lt;</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="bp">^</span><span class="w"> </span><span class="mi">31</span><span class="o">)</span><span class="w"> </span><span class="o">:</span>
+<span class="w">    </span><span class="n">Decoder</span><span class="bp">.</span><span class="n">decode</span><span class="w"> </span><span class="o">(</span><span class="n">Encoder</span><span class="bp">.</span><span class="n">encode</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="n">target</span><span class="o">)</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="bp">=</span><span class="w"> </span><span class="bp">.</span><span class="n">ok</span><span class="w"> </span><span class="n">target</span>
+</code></pre><p>Natural-language reading:</p>
+<blockquote>
+<p>For every bounded source and target byte string, encoding the target relative to the source and then decoding with that source succeeds and returns exactly the target.</p>
+</blockquote>
+<p>This is a strong shape for a first verification target:</p>
+<ul>
+<li>universal inputs;</li>
+<li>visible preconditions;</li>
+<li>an explicit success result;</li>
+<li>an equality that captures the user-facing contract.</li>
+</ul>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://github.com/michaelsproul/lean-bdiff" target="_blank" rel="noopener noreferrer">lean-bdiff</a></div>
+      <div class="slide-index">33 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-34" data-slide="34" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>The theorem statement is the real deliverable</h1>
+<p>Before celebrating a proof, review the proposition like an API contract:</p>
+<ol>
+<li><strong>Quantifiers:</strong> does it cover every intended input?</li>
+<li><strong>Premises:</strong> are the bounds and invariants real, necessary, and satisfiable?</li>
+<li><strong>Result shape:</strong> does it prove success, or only a property <em>if</em> success occurs?</li>
+<li><strong>Model boundary:</strong> which external definitions and axioms are in play?</li>
+<li><strong>Observables:</strong> does equality capture the behaviour users care about?</li>
+</ol>
+<p>For the diff theorem, the <code>&lt; 2^31</code> bounds and <code>.ok target</code> conclusion are not incidental details. They define exactly what was proved.</p>
+<blockquote>
+<p>It is possible to have a flawless proof of a weak, vacuous, or mis-specified theorem.</p>
+</blockquote>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">34 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide dense" id="slide-35" data-slide="35" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>A practical Aeneas workflow</h1>
+<div class="timeline">
+  <div class="num">1</div><div class="step"><strong>Tweak the Rust until it translates.</strong> Simplify unsupported iterator, trait, closure, or library patterns without changing intended behaviour.</div>
+  <div class="num">2</div><div class="step"><strong>Write the desired property in natural language.</strong> State inputs, preconditions, success/failure behaviour, and the observable result.</div>
+  <div class="num">3</div><div class="step"><strong>Inspect the generated top-level function.</strong> Understand its monad, arguments, returned state, and external models.</div>
+  <div class="num">4</div><div class="step"><strong>State the top-level Lean lemma.</strong> Check that the formal statement says what the prose says before proving anything.</div>
+  <div class="num">5</div><div class="step"><strong>Ask an LLM to prove it.</strong> Keep generated code stable; put proofs and helper lemmas in hand-written files.</div>
+  <div class="num">6</div><div class="step"><strong>Audit assumptions.</strong> Challenge every new premise, custom axiom and abstraction.</div>
+  <div class="num">7</div><div class="step"><strong>Repeat.</strong> Refactor Rust, models, statements, and proof structure until the result is both true and useful.</div>
+</div>
+
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">35 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-36" data-slide="36" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Direct an LLM top-down or bottom-up</h1>
+<div class="columns columns-2"><div class="column"><h2>Top-down: discover the proof architecture</h2>
+<ol>
+<li>State the final theorem.</li>
+<li>Split cases or choose induction.</li>
+<li>Introduce helper lemmas at the exact gaps.</li>
+<li>Use <code>sorry</code> temporarily at those gaps.</li>
+<li>Replace each <code>sorry</code> with checked evidence.</li>
+</ol>
+<p><strong>Best for:</strong> exposing the dependency graph and preventing aimless lemma generation.</p>
+</div><div class="column"><h2>Bottom-up: stabilise the leaves</h2>
+<ol>
+<li>Prove primitive arithmetic and bit-operation facts.</li>
+<li>Characterise container and external models.</li>
+<li>Prove one-step function lemmas.</li>
+<li>Compose them into recursive invariants.</li>
+<li>Finish the top-level theorem.</li>
+</ol>
+<p><strong>Best for:</strong> generated code with repetitive low-level obligations.</p>
+<blockquote>
+<p>A strong workflow is hybrid: sketch top-down, discharge bottom-up.</p>
+</blockquote>
+</div></div></div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">36 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide dense" id="slide-37" data-slide="37" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Give the LLM guardrails the kernel can enforce</h1>
+<div class="columns columns-2"><div class="column"><h2>A useful proof request</h2>
+<pre class="code-block language-text"><code>Prove theorem `X` in this file.
+
+Constraints:
+- Do not change the theorem statement.
+- Do not add premises, axioms, or `sorry`.
+- Prefer existing definitions and lemmas.
+- Keep generated Aeneas files unchanged.
+- Run `lake build` after each patch.
+- Explain any premise that appears necessary.
+</code></pre></div><div class="column"><h2>Audit the result</h2>
+<pre class="code-block language-lean"><code><span class="bp">#</span><span class="n">print</span><span class="w"> </span><span class="n">axioms</span><span class="w"> </span><span class="n">X</span>
+</code></pre><p>Also check:</p>
+<ul>
+<li>clean <code>lake build</code>;</li>
+<li>no remaining <code>sorry</code> / <code>admit</code>;</li>
+<li>no surprise <code>sorryAx</code> or custom axioms;</li>
+<li>no theorem weakened by an “obvious” edit;</li>
+<li>tests still exercise the actual Rust implementation.</li>
+</ul>
+</div></div></div>
+    <div class="slide-footer">
+      <div class="slide-source"><a href="https://lean-lang.org/doc/reference/latest/ValidatingProofs/" target="_blank" rel="noopener noreferrer">Lean: validating proofs</a></div>
+      <div class="slide-index">37 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide" id="slide-38" data-slide="38" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>Five takeaways</h1>
+<ol>
+<li>A test demonstrates; a theorem quantifies. Keep both.</li>
+<li>Dependent types turn preconditions and invariants into ordinary types.</li>
+<li>Monads let pure Lean express failure, state, and effectful control flow.</li>
+<li>Aeneas converts much safe Rust into value-level functions, avoiding routine memory proofs.</li>
+<li>LLMs can build proofs; only the statement, assumptions, models, and kernel check determine what was actually established.</li>
+</ol>
+<blockquote>
+<p>Start with one crisp property: a roundtrip, preservation theorem, bounds guarantee, or update/read law.</p>
+</blockquote>
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">38 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+
+<section class="slide dense" id="slide-39" data-slide="39" aria-hidden="true">
+  <div class="slide-shell">
+    <div class="slide-accent" aria-hidden="true"></div>
+    <div class="slide-content"><h1>References and examples</h1>
+<ul>
+<li><a href="https://lean-lang.org/doc/reference/latest/" target="_blank" rel="noopener noreferrer">Lean Language Reference</a></li>
+<li><a href="https://lean-lang.org/theorem_proving_in_lean4/" target="_blank" rel="noopener noreferrer">Theorem Proving in Lean 4</a></li>
+<li><a href="https://lean-lang.org/functional_programming_in_lean/" target="_blank" rel="noopener noreferrer">Functional Programming in Lean</a></li>
+<li><a href="https://doc.rust-lang.org/reference/items/generics.html#const-generics" target="_blank" rel="noopener noreferrer">Rust Reference: const generics</a></li>
+<li><a href="https://github.com/AeneasVerif/aeneas" target="_blank" rel="noopener noreferrer">Aeneas repository</a></li>
+<li><a href="https://arxiv.org/abs/2206.07185" target="_blank" rel="noopener noreferrer">Aeneas: Rust Verification by Functional Translation</a></li>
+<li><a href="https://lean-lang.org/use-cases/aeneas/" target="_blank" rel="noopener noreferrer">Aeneas Lean use case</a></li>
+<li><a href="https://github.com/michaelsproul/lean-bdiff" target="_blank" rel="noopener noreferrer">lean-bdiff</a></li>
+<li><a href="https://github.com/sigp/milhouse/pull/104" target="_blank" rel="noopener noreferrer">Milhouse PR #104 — Aeneas formal verification</a></li>
+</ul>
+<div class="badge-row">
+  <span class="badge"><kbd>→</kbd> next</span>
+  <span class="badge"><kbd>F</kbd> fullscreen</span>
+  <span class="badge"><kbd>N</kbd> notes</span>
+  <span class="badge"><kbd>?</kbd> help</span>
+</div>
+
+</div>
+    <div class="slide-footer">
+      <div class="slide-source"></div>
+      <div class="slide-index">39 / 39</div>
+    </div>
+  </div>
+  <aside class="speaker-notes" aria-label="Speaker notes"></aside>
+</section>
+
+</main>
+<div id="progress" aria-hidden="true"><div></div></div>
+<div id="help" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+  <div class="panel">
+    <h2>Keyboard shortcuts</h2>
+    <p><kbd>→</kbd><kbd>Space</kbd> next slide</p>
+    <p><kbd>←</kbd> previous slide</p>
+    <p><kbd>Home</kbd><kbd>End</kbd> first / last</p>
+    <p><kbd>F</kbd> fullscreen &nbsp; <kbd>N</kbd> notes &nbsp; <kbd>?</kbd> help</p>
+  </div>
+</div>
+<script>
+(() => {
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const progress = document.querySelector('#progress > div');
+  const help = document.querySelector('#help');
+  let current = 0;
+
+  function fromHash() {
+    const raw = location.hash.replace(/^#(?:slide-)?/, '');
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 1 && n <= slides.length ? n - 1 : 0;
+  }
+
+  function show(index, updateHash = true) {
+    current = Math.max(0, Math.min(slides.length - 1, index));
+    slides.forEach((slide, i) => {
+      const active = i === current;
+      slide.classList.toggle('active', active);
+      slide.setAttribute('aria-hidden', active ? 'false' : 'true');
+    });
+    progress.style.width = `${((current + 1) / slides.length) * 100}%`;
+    if (updateHash) history.replaceState(null, '', `#${current + 1}`);
+    document.title = `${current + 1}/${slides.length} · Lean Proving for Rust Programmers`;
+  }
+
+  function next() { show(current + 1); }
+  function prev() { show(current - 1); }
+
+  document.addEventListener('keydown', (event) => {
+    if (event.target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) return;
+    if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(event.key)) { event.preventDefault(); next(); }
+    else if (['ArrowLeft', 'PageUp', 'Backspace'].includes(event.key)) { event.preventDefault(); prev(); }
+    else if (event.key === 'Home') { event.preventDefault(); show(0); }
+    else if (event.key === 'End') { event.preventDefault(); show(slides.length - 1); }
+    else if (event.key.toLowerCase() === 'f') {
+      event.preventDefault();
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+      else document.exitFullscreen?.();
+    }
+    else if (event.key.toLowerCase() === 'n') { document.body.classList.toggle('notes-visible'); }
+    else if (event.key === '?' || event.key.toLowerCase() === 'h') { help.classList.toggle('visible'); }
+    else if (event.key === 'Escape') { help.classList.remove('visible'); document.body.classList.remove('notes-visible'); }
+  });
+
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('a, button, .speaker-notes, #help .panel')) return;
+    if (help.classList.contains('visible')) { help.classList.remove('visible'); return; }
+    if (event.clientX < window.innerWidth * 0.35) prev(); else next();
+  });
+
+  let touchStartX = null;
+  document.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].clientX; }, {passive: true});
+  document.addEventListener('touchend', e => {
+    if (touchStartX === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
+    touchStartX = null;
+  }, {passive: true});
+
+  window.addEventListener('hashchange', () => show(fromHash(), false));
+  show(fromHash(), false);
+})();
+</script>
+</body>
+</html>
