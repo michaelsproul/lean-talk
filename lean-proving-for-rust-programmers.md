@@ -172,7 +172,7 @@ The function does not accept an arbitrary index and then *hope* it is valid. The
 
 ---
 
-# Rust const generics are a useful foothold
+# Comparison to `const` generics
 
 +++
 
